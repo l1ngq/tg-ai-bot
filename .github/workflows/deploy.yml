@@ -9,32 +9,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Validate SSH secrets
-        shell: bash
-        run: |
-          set -e
-          if [ -z "${{ secrets.SSH_HOST }}" ]; then
-            echo "SSH_HOST is empty"
-            exit 1
-          fi
-          if [ -z "${{ secrets.SSH_USER }}" ]; then
-            echo "SSH_USER is empty"
-            exit 1
-          fi
-          if [ -z "${{ secrets.SSH_PORT }}" ]; then
-            echo "SSH_PORT is empty"
-            exit 1
-          fi
-          if [ -z "${{ secrets.SSH_KEY }}" ]; then
-            echo "SSH_KEY is empty"
-            exit 1
-          fi
-          printf "%s" "${{ secrets.SSH_KEY }}" > /tmp/ssh_key
-          chmod 600 /tmp/ssh_key
-          ssh-keygen -lf /tmp/ssh_key
-          rm -f /tmp/ssh_key
       - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
