@@ -4,6 +4,14 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   deploy:
@@ -15,18 +23,32 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          port: ${{ secrets.SSH_PORT }}
+          port: ${{ secrets.SSH_PORT || '22' }}
+          passphrase: ${{ secrets.SSH_PASSPHRASE }}
           script: |
-            set -e
-            APP_DIR=/opt/tg-bot
+            set -eu
+            APP_DIR="/opt/tg-bot"
             REPO_URL="https://github.com/${{ github.repository }}.git"
+            DEPLOY_BRANCH="main"
+            IMAGE_NAME="tg-bot:latest"
+            CONTAINER_NAME="tg-bot"
+            ENV_FILE="$APP_DIR/.env"
+
             if [ ! -d "$APP_DIR/.git" ]; then
+              mkdir -p "$APP_DIR"
               git clone "$REPO_URL" "$APP_DIR"
             fi
             cd "$APP_DIR"
-            git fetch --all
-            git reset --hard origin/main
-            docker build -t tg-bot:latest .
-            docker stop tg-bot || true
-            docker rm tg-bot || true
-            docker run -d --name tg-bot --restart unless-stopped --env-file "$APP_DIR/.env" tg-bot:latest
+            git remote set-url origin "$REPO_URL"
+            git fetch --prune origin
+            git reset --hard "origin/$DEPLOY_BRANCH"
+
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "Missing env file: $ENV_FILE"
+              exit 1
+            fi
+
+            docker build -t "$IMAGE_NAME" .
+            docker stop "$CONTAINER_NAME" || true
+            docker rm "$CONTAINER_NAME" || true
+            docker run -d --name "$CONTAINER_NAME" --restart unless-stopped --env-file "$ENV_FILE" "$IMAGE_NAME"
